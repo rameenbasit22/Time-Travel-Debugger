@@ -1,3 +1,4 @@
+
 # Time-Travel Debugger
 
 ## Phase 01 - Server Side
@@ -20,6 +21,3 @@ The final output is a `.tdbg` file containing the execution history.
 - C++
 - Git/GitHub
 
-## Current Progress
-
-Project structure and initial server setup completed.
