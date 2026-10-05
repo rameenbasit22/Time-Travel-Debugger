@@ -190,19 +190,108 @@ struct PendingPatch
 // PASS 0x0: READING source.bin + VALIDITY CHECK
 bool readSourceLine(ifstream &in, string &out)
 {
-    // reads the next nonblank line
+    while (getline(in, out))
+    {
+        if (!out.empty())
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
+
 string firstWord(const string &line)
 {
-    // returns first word from the input string
+    string word;
+    for (int i = 0; i < (int)line.length(); i++)
+    {
+        if (line[i] != ' ')
+        {
+            word += line[i];
+        }
+        else if (!word.empty())
+        {
+            break;
+        }
+    }
+
+    return word;
 }
 string secondWord(const string &line)
 {
-    // returns the second word
+    string word;
+    int space = 0;
+    for (int i = 0; i < (int)line.length(); i++)
+    {
+        if (line[i] == ' ')
+        {
+            if (!word.empty())
+            {
+                space++;
+                if (space == 2)
+                {
+                    break;
+                }
+            }
+        }
+        else
+        {
+            if (space== 1)
+            {
+                word += line[i];
+            }
+        }
+    }
+    return word;
 }
 bool validateProgram(const char *sourcePath)
 {
-    // for each func defined there should be exactly one func_end and no nested funcs allowed - 
+    ifstream in(sourcePath);
+    if (!in)
+    {
+        cout << "Error in opening the file !!!!" << endl;
+        return false;
+    }
+    string line;
+    bool in_func = false;
+    while (readSourceLine(in, line))
+    {
+        string word = firstWord(line);
+        if (word == "//")
+        {
+          continue;
+        }
+
+        if (word == "func")
+        {
+            if (in_func)
+            {
+                cout << "Error!!!Nested functions are not allowed." << endl;
+                return false;
+            }
+
+            in_func = true;
+        }
+        else if (word == "func_end")
+        {
+            if (!in_func)
+            {
+                cout << "Error!! func_end without func." << endl;
+                return false;
+            }
+
+            in_func = false;
+        }
+    }
+
+    if (in_func)
+    {
+        cout << "Error!! Missing func_end." << endl;
+        return false;
+    }
+
+    return true;
 }
 
 // PASS 0x1: RESOLVE() -> resolve.bin
@@ -276,7 +365,6 @@ void writeTdbg(Timeline &timeline, const char *tdbgPath)
 // main section
 int32_t main()
 {
-
     if (!validateProgram("source.bin"))
     {
         // send an error response instead of a .tdbg file
