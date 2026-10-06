@@ -200,47 +200,39 @@ bool readSourceLine(ifstream &in, string &out)
 
     return false;
 }
-
 string firstWord(const string &line)
 {
-    string word;
-    for (int i = 0; i < (int)line.length(); i++)
+    string word = "";
+    for (int i = 0; i < line.size(); i++)
     {
-        if (line[i] != ' ')
-        {
-            word += line[i];
-        }
-        else if (!word.empty())
+        if (line[i] == ' ')
         {
             break;
         }
+        word = word + line[i];
     }
-
     return word;
 }
 string secondWord(const string &line)
 {
-    string word;
-    int space = 0;
-    for (int i = 0; i < (int)line.length(); i++)
+    string word = "";
+    bool found = false;
+    for (int i = 0; i < line.size(); i++)
     {
         if (line[i] == ' ')
         {
-            if (!word.empty())
+            if (!found)
             {
-                space++;
-                if (space == 2)
-                {
-                    break;
-                }
+                found = true;
+            }
+            else if (!word.empty())
+            {
+                break;
             }
         }
-        else
+        else if (found)
         {
-            if (space== 1)
-            {
-                word += line[i];
-            }
+            word = word + line[i];
         }
     }
     return word;
@@ -326,19 +318,84 @@ int64_t readResolveRecord(FILE *f, string &outText)
 int64_t resolveProgram(const char *sourcePath, const char *resolveBinPath)
 {
     FuncEntry funcArray[MAX_FUNCS];
-    int32_t funcCount = 0;
+    int32_t f_ct = 0;
     PendingPatch patches[MAX_PATCHES];
-    int32_t patchCount = 0;
-    // Every source line becomes one record holding the raw line, as-is.
-    // resolve() only PEEKS at the leading word(s) -- enough to spot FUNC
-    // (remember its position) and CALL (remember which function it needs
-    // and where its offset field sits).
-    // Once the whole file is written, every CALL's offset field is patched
-    // with its target's position. Patching happens after the full write
-    // Returns the byte offset of main's FUNC header record.
-    // if there is no main return the error 
+    int32_t p_ct = 0;
+    FILE *srcFile = fopen(sourcePath, "r");
+    FILE *resFile = fopen(resolveBinPath, "wb");
+    if (srcFile == nullptr || resFile == nullptr)
+    {
+        cout << "Error in opening the file." << endl;
+        return -1;
+    }
+    char buffer[1024];
+    string line;
+    int64_t pos = 0;
+    int64_t pos2 = -1;
+    while (fgets(buffer, sizeof(buffer), srcFile))
+    {
+        line = buffer;
+        if (!line.empty() && line.back() == '\n')
+        {
+            line.pop_back();
+        }
+        if (line.empty())
+        {
+            continue;
+        }
+        string word = firstWord(line);
+        if (word == "func")
+        {
+            string name = secondWord(line);
+            funcArray[f_ct].funcName = name;
+            funcArray[f_ct].byteOffsetInResolveBin = pos;
+            if (name == "main")
+            {
+                pos2 = pos;
+            }
+            f_ct++;
+        }
+        if (word == "call")
+        {
+            string name = secondWord(line);
+            patches[p_ct].targetFuncName = name;
+            patches[p_ct].byteOffsetOfOffsetField = pos;
+            p_ct++;
+        }
+        writeResolveRecord(resFile, 0, line);
+        pos = pos + 8 + 4 + line.size();
+    }
+    for (int32_t i = 0; i < p_ct; i++)
+    {
+        bool found = false;
+        for (int32_t j = 0; j < f_ct; j++)
+        {
+            if (patches[i].targetFuncName == funcArray[j].funcName)
+            {
+                int64_t target_pos =funcArray[j].byteOffsetInResolveBin;
+                fseek(resFile,patches[i].byteOffsetOfOffsetField,SEEK_SET);
+                fwrite(&target_pos, sizeof(targetPos), 1, resFile);
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+        {
+            cout << "Error!! Function " << patches[i].targetFuncName<< " not found." << endl;
+            fclose(srcFile);
+            fclose(resFile);
+            return -1;
+        }
+    }
+    fclose(srcFile);
+    fclose(resFile);
+    if (pos2 == -1)
+    {
+        cout << "Error!! main function not found." << endl;
+        return -1;
+    }
+    return pos2;
 }
-
 // PASS 0x2: EXECUTION (tokenization happens here)
 enum TokenType
 {
