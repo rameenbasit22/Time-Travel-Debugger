@@ -30,12 +30,12 @@
 ### Day 3 (6-10-2026)
 # Pass 1
 - Implemented the functions: writeResolveRecord and readResolveRecord
-
+- While working on resolveProgram, faced some errors while running the main which after debugging in gdb showed that there were error in firstWord() and secondWord() functions so fixed them again and then ran ./server again and results were correct this time.
 ### Status
 
-Pass 0 validation completed and tested.
+Pass 1 Resolve completed and tested.
 
 ### Next Step
 
-Implement Pass 1 Resolve.
+Implement Pass 2 Execution.
 
