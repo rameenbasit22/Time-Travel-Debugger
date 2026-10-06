@@ -27,6 +27,10 @@
 - Added comment line handling.
 - Tested valid and invalid C-- programs.
 
+### Day 3 (6-10-2026)
+# Pass 1
+- Implemented the functions: writeResolveRecord and readResolveRecord
+
 ### Status
 
 Pass 0 validation completed and tested.
