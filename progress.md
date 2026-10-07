@@ -36,11 +36,19 @@
 # Pass 2
 - Implemented the Timeline class
 - Done with the tokenizeLine() function and also corrected a wrong variable name in pass 1 as it gave error
-### Status
 
-Pass 1 Resolve completed and tested and Pass 2 is in progress.
+### Day 5 (8-10-2026)
+# Pass 2
+- Continued with implementation of executeProgram()
+- To avoid making the function complex I divided it into smaller parts like set, add etc variable.
+- Did the call to jump to required function
+- Did func end to return to calling function
+- It took a lot of time as it was complex but still ended with testing it and everything worked properly
+
+### Status
+Pass 2 is now completed.
 
 ### Next Step
 
-Implement Pass 2 Execution.
+Implement Pass 3 .
 
