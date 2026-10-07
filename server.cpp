@@ -389,7 +389,7 @@ int64_t resolveProgram(const char *sourcePath, const char *resolveBinPath)
             {
                 int64_t target_pos =funcArray[j].byteOffsetInResolveBin;
                 fseek(resFile,patches[i].byteOffsetOfOffsetField,SEEK_SET);
-                fwrite(&target_pos, sizeof(targetPos), 1, resFile);
+                fwrite(&target_pos, sizeof(pos2), 1, resFile);
                 found = true;
                 break;
             }
@@ -425,10 +425,41 @@ struct Token
 };
 int32_t tokenizeLine(const string &line, Token tokens[], int32_t maxTokens)
 {
-    // first word is always a instruction keyword
-    // instruction set = [func, func_end, call, set, add, sub, mul and div]
-    // next word is identifier like name of a function, variable name
-    // after identifier all are the params/arg, space separated
+    int32_t ct = 0;
+    string word = "";
+    for (int i = 0; i <= line.size(); i++)
+    {
+        if (i == line.size() || line[i] == ' ')
+        {
+            if (!word.empty())
+            {
+                if (ct == 0)
+                {
+                    tokens[ct].type = KEYWORD;
+                }
+                else if (ct == 1)
+                {
+                    tokens[ct].type = IDENTIFIER;
+                }
+                else
+                {
+                    tokens[ct].type = PARAM;
+                }
+                tokens[ct].text = word;
+                ct++;
+                word = "";
+            }
+        }
+        else
+        {
+            word = word + line[i];
+        }
+        if (ct >= maxTokens)
+        {
+            break;
+        }
+    }
+    return ct;
 }
 Snapshot *buildSnapshot(Stack<Frame> &callStack)
 {
@@ -456,18 +487,18 @@ void writeTdbg(Timeline &timeline, const char *tdbgPath)
 // main section
 int32_t main()
 {
-    if (!validateProgram("source.bin"))
+    Token tokens[16];
+
+    string line = "call addNum x";
+
+    int32_t count = tokenizeLine(line, tokens, 16);
+
+    cout << "Token count: " << count << endl;
+
+    for (int32_t i = 0; i < count; i++)
     {
-        // send an error response instead of a .tdbg file
-        return 1;
+        cout << tokens[i].text << endl;
     }
-
-    int64_t mainOffset = resolveProgram("source.bin", "resolve.bin");
-
-    Timeline timeline;
-    executeProgram("resolve.bin", mainOffset, timeline);
-
-    writeTdbg(timeline, "session.tdbg");
 
     return 0;
 }
