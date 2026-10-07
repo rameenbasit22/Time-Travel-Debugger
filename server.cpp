@@ -14,7 +14,7 @@
 #include <fstream>
 #include <unistd.h>
 #include <sys/socket.h>
-#include <cstdint>
+#include <cstdlib>
 #include <cstdio>
 using namespace std;
 
@@ -468,16 +468,210 @@ Snapshot *buildSnapshot(Stack<Frame> &callStack)
     callStack.snapshot_into(ss->callStack, MAX_STACK_DEPTH);
     return ss;
 }
+void set_var(Frame &frame, string name, int32_t value)
+{
+    frame.locals[frame.localCount].name = name;
+    frame.locals[frame.localCount].value = value;
+    frame.localCount++;
+}
+void add_var(Frame &frame, string name, int32_t value)
+{
+    for (int32_t i = 0; i < frame.localCount; i++)
+    {
+        if (frame.locals[i].name == name)
+        {
+            frame.locals[i].value = frame.locals[i].value + value;
+            return;
+        }
+    }
+}
+void sub_var(Frame &frame, string name, int32_t value)
+{
+    for (int32_t i = 0; i < frame.localCount; i++)
+    {
+        if (frame.locals[i].name == name)
+        {
+            frame.locals[i].value = frame.locals[i].value - value;
+            return;
+        }
+    }
+}
+void mul_var(Frame &frame, string name, int32_t value)
+{
+    for (int32_t i = 0; i < frame.localCount; i++)
+    {
+        if (frame.locals[i].name == name)
+        {
+            frame.locals[i].value = frame.locals[i].value * value;
+            return;
+        }
+    }
+}
+void div_var(Frame &frame, string name, int32_t value)
+{
+    if (value == 0)
+    {
+        cout << "Error!! Cannot divide by zero." << endl;
+        return;
+    }
+    for (int32_t i = 0; i < frame.localCount; i++)
+    {
+        if (frame.locals[i].name == name)
+        {
+            frame.locals[i].value = frame.locals[i].value / value;
+            return;
+        }
+    }
+}
 void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &timeline)
 {
-    // initialize the call stack
-    // make the main frame
-    // push main frame on the call stack
+    Stack<Frame> callStack;
+    Frame mainFrame;
+    mainFrame.func_name = "main";
+    mainFrame.argc = 0;
+    mainFrame.returnLine = -1;
+    mainFrame.localCount = 0;
 
-    // implementation:
-    // execute line by line, and according to the keyword perform action
+    callStack.push(mainFrame);
+    FILE *file = fopen(resolveBinPath, "rb");
+    if (file == nullptr)
+    {
+        cout << "Error in opening resolve.bin." << endl;
+        return;
+    }
+    fseek(file, mainOffset, SEEK_SET);
+    int64_t return_pos[MAX_STACK_DEPTH];
+    int32_t return_ct = 0;
+    string line;
+    while (true)
+    {
+        int64_t offset = readResolveRecord(file, line);
+        if (offset == -1)
+        {
+            break;
+        }
+        Token tokens[16];
+        int32_t ct = tokenizeLine(line, tokens, 16);
+        if (ct == 0)
+        {
+            continue;
+        }
+        string word = tokens[0].text;
+        cout << "Executing: " << line << endl;
+        if (word == "set")
+        {
+            if (ct >= 3)
+            {
+                Frame &frame = callStack.peek();
+                string name = tokens[1].text;
+                int32_t value = atoi(tokens[2].text.c_str());
+                set_var(frame, name, value);
+            }
+            Snapshot *ss = buildSnapshot(callStack);
+            timeline.record(ss);
+        }
+        else if (word == "add")
+        {
+            if (ct >= 3)
+            {
+                Frame &frame = callStack.peek();
+                string name = tokens[1].text;
+                int32_t value = atoi(tokens[2].text.c_str());
+                add_var(frame, name, value);
+            }
+            Snapshot *ss= buildSnapshot(callStack);
+            timeline.record(ss);
+        }
+        else if (word == "sub")
+        {
+            if (ct >= 3)
+            {
+                Frame &frame = callStack.peek();
+                string name = tokens[1].text;
+                int32_t value = atoi(tokens[2].text.c_str());
+                sub_var(frame, name, value);
+            }
+            Snapshot *ss = buildSnapshot(callStack);
+            timeline.record(ss);
+        }
+        else if (word == "mul")
+        {
+            if (ct >= 3)
+            {
+                Frame &frame = callStack.peek();
+                string name = tokens[1].text;
+                int32_t value = atoi(tokens[2].text.c_str());
+                mul_var(frame, name, value);
+            }
+            Snapshot *ss = buildSnapshot(callStack);
+            timeline.record(ss);
+        }
+        else if (word == "div")
+        {
+            if (ct >= 3)
+            {
+                Frame &frame = callStack.peek();
+                string name = tokens[1].text;
+                int32_t value = atoi(tokens[2].text.c_str());
+                div_var(frame, name, value);
+            }
+            Snapshot *ss = buildSnapshot(callStack);
+            timeline.record(ss);
+        }
+        else if (word == "call")
+        {
+            if (ct >= 2)
+            {
+                Frame old_frame = callStack.peek();
+                Frame new_frame;
+                new_frame.func_name = tokens[1].text;
+                new_frame.argc = ct - 2;
+                new_frame.returnLine = -1;
+                new_frame.localCount = 0;
+                for (int32_t i = 0; i < new_frame.argc; i++)
+                {
+                    string name = tokens[i + 2].text;
+                    for (int32_t j = 0; j < old_frame.localCount; j++)
+                    {
+                        if (old_frame.locals[j].name == name)
+                        {
+                            new_frame.argv[i].name = name;
+                            new_frame.argv[i].value = old_frame.locals[j].value;
+                            new_frame.locals[i].name = name;
+                            new_frame.locals[i].value =old_frame.locals[j].value;
+                            new_frame.localCount++;
+                            break;
+                        }
+                    }
+                }
+                return_pos[return_ct] = ftell(file);
+                return_ct++;
+                callStack.push(new_frame);
+                fseek(file, offset, SEEK_SET);
+            }
+            Snapshot *ss = buildSnapshot(callStack);
+            timeline.record(ss);
+        }
+        else if (word == "func_end")
+        {
+            if (callStack.depth() > 1)
+            {
+                callStack.pop();
+                return_ct--;
+                fseek(file, return_pos[return_ct], SEEK_SET);
+            }
+            else
+            {
+                Snapshot *ss= buildSnapshot(callStack);
+                timeline.record(ss);
+                break;
+            }
+            Snapshot *ss = buildSnapshot(callStack);
+            timeline.record(ss);
+        }
+    }
+    fclose(file);
 }
-
 // PASS 0x3: SERIALIZE TIMELINE
 void writeTdbg(Timeline &timeline, const char *tdbgPath)
 {
@@ -490,18 +684,28 @@ void writeTdbg(Timeline &timeline, const char *tdbgPath)
 // main section
 int32_t main()
 {
+    // Pass 0: Validation
     if (!validateProgram("source.bin"))
     {
         return 1;
     }
+    cout << "Pass 0 successful" << endl;
+
+    // Pass 1: Resolve
     int64_t mainOffset = resolveProgram("source.bin", "resolve.bin");
     if (mainOffset == -1)
     {
         return 1;
     }
-    Timeline timeline;
-    executeProgram("resolve.bin", mainOffset, timeline);
-    writeTdbg(timeline, "session.tdbg");
+    cout << "Pass 1 successful" << endl;
+    cout << "Main offset: " << mainOffset << endl;
 
+    Timeline timeline;
+    // Pass 2: Execution
+    executeProgram("resolve.bin", mainOffset, timeline);
+    cout << "Total snapshots: "<< timeline.getStepCount() << endl;
+
+    // Pass 3: Serialization
+    writeTdbg(timeline, "session.tdbg");
     return 0;
 }
