@@ -35,6 +35,7 @@
 ### Day 4 (7-10-2026)
 # Pass 2
 - Implemented the Timeline class
+- Done with the tokenizeLine() function and also corrected a wrong variable name in pass 1 as it gave error
 ### Status
 
 Pass 1 Resolve completed and tested and Pass 2 is in progress.
