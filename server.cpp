@@ -463,7 +463,10 @@ int32_t tokenizeLine(const string &line, Token tokens[], int32_t maxTokens)
 }
 Snapshot *buildSnapshot(Stack<Frame> &callStack)
 {
-    // build the snapshot based on the callStack given
+    Snapshot *ss = new Snapshot;
+    ss->stackDepth = callStack.depth();
+    callStack.snapshot_into(ss->callStack, MAX_STACK_DEPTH);
+    return ss;
 }
 void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &timeline)
 {
@@ -487,18 +490,18 @@ void writeTdbg(Timeline &timeline, const char *tdbgPath)
 // main section
 int32_t main()
 {
-    Token tokens[16];
-
-    string line = "call addNum x";
-
-    int32_t count = tokenizeLine(line, tokens, 16);
-
-    cout << "Token count: " << count << endl;
-
-    for (int32_t i = 0; i < count; i++)
+    if (!validateProgram("source.bin"))
     {
-        cout << tokens[i].text << endl;
+        return 1;
     }
+    int64_t mainOffset = resolveProgram("source.bin", "resolve.bin");
+    if (mainOffset == -1)
+    {
+        return 1;
+    }
+    Timeline timeline;
+    executeProgram("resolve.bin", mainOffset, timeline);
+    writeTdbg(timeline, "session.tdbg");
 
     return 0;
 }
