@@ -119,25 +119,40 @@ struct TimelineNode
 class Timeline
 {
     TimelineNode *head, *tail;
-    int32_t stepCount;
-
+    int32_t ct;
 public:
-    // Implement these functions
     Timeline()
     {
+        head = nullptr;
+        tail = nullptr;
+        ct = 0;
     }
     void record(Snapshot *s)
     {
-        // add record in the timeline
+        TimelineNode *temp = new TimelineNode;
+        temp->data = s;
+        temp->next = nullptr;
+        temp->prev = tail;
+        if (head == nullptr)
+        {
+            head = temp;
+        }
+        else
+        {
+            tail->next = temp;
+        }
+        tail = temp;
+        ct++;
     }
     TimelineNode *begin()
     {
+        return head;
     }
     int32_t getStepCount()
     {
+        return ct;
     }
 };
-
 // Core structs
 struct Variable
 {
