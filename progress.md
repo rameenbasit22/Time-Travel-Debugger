@@ -44,11 +44,14 @@
 - Did the call to jump to required function
 - Did func end to return to calling function
 - It took a lot of time as it was complex but still ended with testing it and everything worked properly
+# Pass 3
+- Started Pass 3 with placing struct TTDB and placeholders in writeHeader
+- Made some helping functions for writing snapshots to serialize strings and variables 
 
 ### Status
-Pass 2 is now completed.
+Pass 2 is now completed and Pass 3 is in progress.
 
 ### Next Step
 
-Implement Pass 3 .
+Implement Pass 3 remaining functions.
 
