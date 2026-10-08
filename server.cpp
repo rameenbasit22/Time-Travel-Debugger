@@ -40,59 +40,51 @@ class Stack
         Node *next;
     };
     Node *top; 
-    int32_t count;
+    int32_t ct;
 
 public:
     Stack()
 {
     top = nullptr;
-    count = 0;
+    ct = 0;
 }
-
 void push(const T &val)
 {
-    if (count >= MAX_STACK_DEPTH)
+    if (ct >= MAX_STACK_DEPTH)
     {
         return;
     }
-
     Node *temp = new Node;
     temp->data = val;
     temp->next = top;
     top = temp;
-    count++;
+    ct++;
 }
-
 T pop()
 {
     if (top == nullptr)
     {
         return T();
     }
-
     Node *temp = top;
     T value = temp->data;
     top = top->next;
     delete temp;
-    count--;
+    ct--;
     return value;
 }
-
 T &peek()
 {
     return top->data;
 }
-
 bool isEmpty()
 {
     return top == nullptr;
 }
-
 int32_t depth()
 {
-    return count;
+    return ct;
 }
-
 int32_t snapshot_into(T out[], int32_t maxLen)
 {
     Node *present = top;
@@ -175,7 +167,7 @@ struct Snapshot
 };
 struct TTDBHeader
 {
-    char magic[4]; // "TTDB"
+    char magic[4];
     int32_t version;
     int32_t stepCount;
     int64_t indexOffset;
@@ -184,10 +176,9 @@ void writeHeader(FILE *f, const TTDBHeader &h)
 {
     fwrite(h.magic, 1, 4, f);
     fwrite(&h.version, sizeof(int32_t), 1, f);
-
-    // placeholder for other two data members
+    fwrite(&h.stepCount, sizeof(int32_t), 1, f);
+    fwrite(&h.indexOffset, sizeof(int64_t), 1, f);
 }
-
 // resolve.bin - bookkeeping
 struct FuncEntry
 {
@@ -673,6 +664,37 @@ void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &ti
     fclose(file);
 }
 // PASS 0x3: SERIALIZE TIMELINE
+void write_str(FILE *f, const string &text)
+{
+    int32_t size = text.size();
+    fwrite(&size, sizeof(int32_t), 1, f);
+    fwrite(text.c_str(), sizeof(char), size, f);
+}
+void write_var(FILE *f, const Variable &var)
+{
+    write_str(f, var.name);
+    fwrite(&var.value, sizeof(int32_t), 1, f);
+}
+void write_ss(FILE *f, const Snapshot &s)
+{
+    fwrite(&s.stackDepth, sizeof(int32_t), 1, f);
+    for (int32_t i = 0; i < s.stackDepth; i++)
+    {
+        const Frame &frame = s.callStack[i];
+        write_str(f, frame.func_name);
+        fwrite(&frame.argc, sizeof(int32_t), 1, f);
+        for (int32_t j = 0; j < frame.argc; j++)
+        {
+            write_var(f, frame.argv[j]);
+        }
+        fwrite(&frame.returnLine, sizeof(int32_t), 1, f);
+        fwrite(&frame.localCount, sizeof(int32_t), 1, f);
+        for (int32_t j = 0; j < frame.localCount; j++)
+        {
+            write_var(f, frame.locals[j]);
+        }
+    }
+}
 void writeTdbg(Timeline &timeline, const char *tdbgPath)
 {
     // placeholder for header
