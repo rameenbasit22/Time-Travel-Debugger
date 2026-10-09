@@ -48,10 +48,16 @@
 - Started Pass 3 with placing struct TTDB and placeholders in writeHeader
 - Made some helping functions for writing snapshots to serialize strings and variables 
 
+### Day 6 (10-10-2026)
+# Pass 3
+- Implemented the writeTdbg() function which completes the pass 3
+- Compiled and ran the program and it worked correctly
+- Checked whether session.tdbg is created properly and yes it did
+
 ### Status
-Pass 2 is now completed and Pass 3 is in progress.
+Pass 3 is now completed.
 
 ### Next Step
 
-Implement Pass 3 remaining functions.
+Final check of the whole program and to remove some warnings shown during the compilation. Ensure that correct session.tdbg is generated everytime.
 
