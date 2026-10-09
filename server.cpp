@@ -697,11 +697,40 @@ void write_ss(FILE *f, const Snapshot &s)
 }
 void writeTdbg(Timeline &timeline, const char *tdbgPath)
 {
-    // placeholder for header
-    // index array of the size of stepcount from the timeline
-    // placing each snapshot in the file while maintaining the index(starting point of each nth snapshot)
-    // after timeline add the index array i the file
-    // update the header
+    FILE *f = fopen(tdbgPath, "wb");
+    if (f == nullptr)
+    {
+        cout << "Error in creating session.tdbg." << endl;
+        return;
+    }
+    TTDBHeader h;
+    h.magic[0] = 'T';
+    h.magic[1] = 'T';
+    h.magic[2] = 'D';
+    h.magic[3] = 'B';
+    h.version = 1;
+    h.stepCount = timeline.getStepCount();
+    h.indexOffset = 0;
+    writeHeader(f, h);
+
+    int64_t *idx = new int64_t[h.stepCount];
+    TimelineNode *node = timeline.begin();
+    for (int32_t i = 0; i < h.stepCount; i++)
+    {
+        idx[i] = ftell(f);
+        write_ss(f, *node->data);
+        node = node->next;
+    }
+    h.indexOffset = ftell(f);
+    for (int32_t i = 0; i < h.stepCount; i++)
+    {
+        fwrite(&idx[i], sizeof(int64_t), 1, f);
+    }
+    fseek(f, 0, SEEK_SET);
+    writeHeader(f, h);
+    delete[] idx;
+    fclose(f);
+    cout << "Pass 3 successful!!" << endl;
 }
 // main section
 int32_t main()
