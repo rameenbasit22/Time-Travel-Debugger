@@ -14,7 +14,11 @@ const int STARTUP_MAX_ATTEMPTS = 50;
 const int STARTUP_POLL_INTERVAL_MS = 100;
 const int MAX_JUMP = 1000000000;
 const char TDBG_FILE[] = "ttdb_last.tdbg";
-
+const int MAX_FUNCS = 128;
+const int MAX_TOKENS = MAX_VARS_PER_FRAME + 2;
+const int MAX_PATCHES = MAX_FUNCS * 4;
+const uint64_t MAX_SOURCE_BYTES = 15ULL * 1024 * 1024;
+const int SOCKET_TIMEOUT_SEC = 5;
 // Shared Phase 01 structures
 struct Variable
 {
@@ -145,4 +149,11 @@ public:
                 static_cast<unsigned char>(last_bytes[3])) << 24);
         return received == crc.get_checksum();
     }
+    void get_trailer(char output[4]) const
+{
+    for (int i = 0; i < 4; i++)
+    {
+        output[i] = last_bytes[i];
+    }
+}
 };
