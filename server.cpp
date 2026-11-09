@@ -16,6 +16,7 @@
 #include <sys/socket.h>
 #include <cstdlib>
 #include <cstdio>
+#include <cstddef>
 using namespace std;
 
 // ---- Constants ----
@@ -209,7 +210,7 @@ bool readSourceLine(ifstream &in, string &out)
 string firstWord(const string &line)
 {
     string word = "";
-    for (int i = 0; i < line.size(); i++)
+    for (size_t i = 0; i < line.size(); i++)
     {
         if (line[i] == ' ')
         {
@@ -223,7 +224,7 @@ string secondWord(const string &line)
 {
     string word = "";
     bool found = false;
-    for (int i = 0; i < line.size(); i++)
+    for (size_t i = 0; i < line.size(); i++)
     {
         if (line[i] == ' ')
         {
@@ -418,7 +419,7 @@ int32_t tokenizeLine(const string &line, Token tokens[], int32_t maxTokens)
 {
     int32_t ct = 0;
     string word = "";
-    for (int i = 0; i <= line.size(); i++)
+    for (size_t i = 0; i <= line.size(); i++)
     {
         if (i == line.size() || line[i] == ' ')
         {

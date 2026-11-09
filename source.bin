@@ -1,0 +1,8 @@
+func main
+set x 10
+call addNum x
+func_end
+
+func addNum
+add x 5
+func_end
