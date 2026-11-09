@@ -62,10 +62,11 @@ Pass 3 is now completed and everything is tested.
 ### Day 1 
 - I added the helper for phase 2 along with the CRC32
 - I changed server.cpp by removing some constant and adding them to helper.h and also removed some structs like Variable etc
+- I added socket helper like sendAll and sendError in load_balancer file but crc32 trail is still missing in sendError which will be implemneted later
 
 ### Status
 Helper function working correctly and also the server.cpp file.
 
 ### Next Step
-I will now work on load balancer.
+I will now work on other functions in load balancer.
 
