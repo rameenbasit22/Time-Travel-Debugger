@@ -191,7 +191,34 @@ struct PendingPatch
     int64_t byteOffsetOfOffsetField; // where in resolve.bin to seek back and overwrite
     string targetFuncName;
 };
+void printSnapshots(Timeline &timeline)
+{
+    TimelineNode *node = timeline.begin();
+    int count = 0;
 
+    while (node != nullptr)
+    {
+        cout << "\nSnapshot " << count << endl;
+
+        Snapshot *s = node->data;
+
+        for (int32_t i = 0; i < s->stackDepth; i++)
+        {
+            Frame &frame = s->callStack[i];
+
+            cout << "Function: " << frame.func_name << endl;
+
+            for (int32_t j = 0; j < frame.localCount; j++)
+            {
+                cout << frame.locals[j].name
+                     << " = " << frame.locals[j].value << endl;
+            }
+        }
+
+        node = node->next;
+        count++;
+    }
+}
 
 
 // PASS 0x0: READING source.bin + VALIDITY CHECK
@@ -462,43 +489,98 @@ Snapshot *buildSnapshot(Stack<Frame> &callStack)
 }
 void set_var(Frame &frame, string name, int32_t value)
 {
+    for (int32_t i = 0; i < frame.localCount; i++)
+    {
+        if (frame.locals[i].name == name)
+        {
+            frame.locals[i].value = value;
+            return;
+        }
+    }
+
+    if (frame.localCount >= MAX_VARS_PER_FRAME)
+    {
+        cout << "Error!! Maximum variables reached." << endl;
+        return;
+    }
+
     frame.locals[frame.localCount].name = name;
     frame.locals[frame.localCount].value = value;
     frame.localCount++;
 }
+
+bool get_operand_value(Frame &frame, string operand, int32_t &value)
+{
+    char *end;
+    errno = 0;
+
+    long num = strtol(operand.c_str(), &end, 10);
+
+    if (end != operand.c_str() && *end == '\0' &&
+        errno != ERANGE && num >= -2147483648L &&
+        num <= 2147483647L)
+    {
+        value = static_cast<int32_t>(num);
+        return true;
+    }
+
+    for (int32_t i = 0; i < frame.localCount; i++)
+    {
+        if (frame.locals[i].name == operand)
+        {
+            value = frame.locals[i].value;
+            return true;
+        }
+    }
+
+    cout << "Error!! Variable or number " << operand
+         << " not found." << endl;
+
+    return false;
+}
+
 void add_var(Frame &frame, string name, int32_t value)
 {
     for (int32_t i = 0; i < frame.localCount; i++)
     {
         if (frame.locals[i].name == name)
         {
-            frame.locals[i].value = frame.locals[i].value + value;
+            frame.locals[i].value += value;
             return;
         }
     }
+
+    cout << "Error!! Variable " << name << " not found." << endl;
 }
+
 void sub_var(Frame &frame, string name, int32_t value)
 {
     for (int32_t i = 0; i < frame.localCount; i++)
     {
         if (frame.locals[i].name == name)
         {
-            frame.locals[i].value = frame.locals[i].value - value;
+            frame.locals[i].value -= value;
             return;
         }
     }
+
+    cout << "Error!! Variable " << name << " not found." << endl;
 }
+
 void mul_var(Frame &frame, string name, int32_t value)
 {
     for (int32_t i = 0; i < frame.localCount; i++)
     {
         if (frame.locals[i].name == name)
         {
-            frame.locals[i].value = frame.locals[i].value * value;
+            frame.locals[i].value *= value;
             return;
         }
     }
+
+    cout << "Error!! Variable " << name << " not found." << endl;
 }
+
 void div_var(Frame &frame, string name, int32_t value)
 {
     if (value == 0)
@@ -506,14 +588,17 @@ void div_var(Frame &frame, string name, int32_t value)
         cout << "Error!! Cannot divide by zero." << endl;
         return;
     }
+
     for (int32_t i = 0; i < frame.localCount; i++)
     {
         if (frame.locals[i].name == name)
         {
-            frame.locals[i].value = frame.locals[i].value / value;
+            frame.locals[i].value /= value;
             return;
         }
     }
+
+    cout << "Error!! Variable " << name << " not found." << endl;
 }
 void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &timeline)
 {
@@ -523,8 +608,8 @@ void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &ti
     mainFrame.argc = 0;
     mainFrame.returnLine = -1;
     mainFrame.localCount = 0;
-
     callStack.push(mainFrame);
+
     FILE *file = fopen(resolveBinPath, "rb");
     if (file == nullptr)
     {
@@ -535,6 +620,7 @@ void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &ti
     int64_t return_pos[MAX_STACK_DEPTH];
     int32_t return_ct = 0;
     string line;
+
     while (true)
     {
         int64_t offset = readResolveRecord(file, line);
@@ -542,8 +628,10 @@ void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &ti
         {
             break;
         }
-        Token tokens[16];
-        int32_t ct = tokenizeLine(line, tokens, 16);
+
+        Token tokens[MAX_TOKENS];
+        int32_t ct = tokenizeLine(line, tokens, MAX_TOKENS);
+
         if (ct == 0)
         {
             continue;
@@ -568,10 +656,13 @@ void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &ti
             {
                 Frame &frame = callStack.peek();
                 string name = tokens[1].text;
-                int32_t value = atoi(tokens[2].text.c_str());
-                add_var(frame, name, value);
+                int32_t value;
+                if (get_operand_value(frame, tokens[2].text, value))
+                {
+                    add_var(frame, name, value);
+                }
             }
-            Snapshot *ss= buildSnapshot(callStack);
+            Snapshot *ss = buildSnapshot(callStack);
             timeline.record(ss);
         }
         else if (word == "sub")
@@ -580,8 +671,11 @@ void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &ti
             {
                 Frame &frame = callStack.peek();
                 string name = tokens[1].text;
-                int32_t value = atoi(tokens[2].text.c_str());
-                sub_var(frame, name, value);
+                int32_t value;
+                if (get_operand_value(frame, tokens[2].text, value))
+                {
+                    sub_var(frame, name, value);
+                }
             }
             Snapshot *ss = buildSnapshot(callStack);
             timeline.record(ss);
@@ -592,8 +686,11 @@ void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &ti
             {
                 Frame &frame = callStack.peek();
                 string name = tokens[1].text;
-                int32_t value = atoi(tokens[2].text.c_str());
-                mul_var(frame, name, value);
+                int32_t value;
+                if (get_operand_value(frame, tokens[2].text, value))
+                {
+                    mul_var(frame, name, value);
+                }
             }
             Snapshot *ss = buildSnapshot(callStack);
             timeline.record(ss);
@@ -604,8 +701,11 @@ void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &ti
             {
                 Frame &frame = callStack.peek();
                 string name = tokens[1].text;
-                int32_t value = atoi(tokens[2].text.c_str());
-                div_var(frame, name, value);
+                int32_t value;
+                if (get_operand_value(frame, tokens[2].text, value))
+                {
+                    div_var(frame, name, value);
+                }
             }
             Snapshot *ss = buildSnapshot(callStack);
             timeline.record(ss);
@@ -614,30 +714,82 @@ void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &ti
         {
             if (ct >= 2)
             {
+                if (callStack.depth() >= MAX_STACK_DEPTH ||
+                    return_ct >= MAX_STACK_DEPTH)
+                {
+                    cout << "Error!! Maximum call stack depth reached." << endl;
+                    fclose(file);
+                    return;
+                }
+                int64_t current_pos = ftell(file);
+                string headerLine;
+                fseek(file, offset, SEEK_SET);
+
+                int64_t headerOffset = readResolveRecord(file, headerLine);
+                if (headerOffset == -1)
+                {
+                    cout << "Error!! Cannot read function header." << endl;
+                    fclose(file);
+                    return;
+                }
+                Token headerTokens[MAX_TOKENS];
+                int32_t headerCount = tokenizeLine(
+                    headerLine, headerTokens, MAX_TOKENS);
+                if (headerCount < 2 ||
+                    headerTokens[0].text != "func")
+                {
+                    cout << "Error!! Invalid function header." << endl;
+                    fclose(file);
+                    return;
+                }
+                int32_t argCount = headerCount - 2;
+                if (argCount != ct - 2)
+                {
+                    cout << "Error!! Incorrect number of arguments." << endl;
+                    fclose(file);
+                    return;
+                }
+
                 Frame old_frame = callStack.peek();
                 Frame new_frame;
-                new_frame.func_name = tokens[1].text;
-                new_frame.argc = ct - 2;
+                new_frame.func_name = headerTokens[1].text;
+                new_frame.argc = argCount;
                 new_frame.returnLine = -1;
                 new_frame.localCount = 0;
-                for (int32_t i = 0; i < new_frame.argc; i++)
+                for (int32_t i = 0; i < argCount; i++)
                 {
-                    string name = tokens[i + 2].text;
+                    string actualName = tokens[i + 2].text;
+                    string formalName = headerTokens[i + 2].text;
+                    bool found = false;
                     for (int32_t j = 0; j < old_frame.localCount; j++)
                     {
-                        if (old_frame.locals[j].name == name)
+                        if (old_frame.locals[j].name == actualName)
                         {
-                            new_frame.argv[i].name = name;
-                            new_frame.argv[i].value = old_frame.locals[j].value;
-                            new_frame.locals[i].name = name;
-                            new_frame.locals[i].value =old_frame.locals[j].value;
+                            new_frame.argv[i].name = actualName;
+                            new_frame.argv[i].value =
+                                old_frame.locals[j].value;
+
+                            new_frame.locals[i].name = formalName;
+                            new_frame.locals[i].value =
+                                old_frame.locals[j].value;
+
                             new_frame.localCount++;
+
+                            found = true;
                             break;
                         }
                     }
+                    if (!found)
+                    {
+                        cout << "Error!! Argument variable "
+                             << actualName << " not found." << endl;
+                        fclose(file);
+                        return;
+                    }
                 }
-                return_pos[return_ct] = ftell(file);
+                return_pos[return_ct] = current_pos;
                 return_ct++;
+
                 callStack.push(new_frame);
                 fseek(file, offset, SEEK_SET);
             }
@@ -648,13 +800,30 @@ void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &ti
         {
             if (callStack.depth() > 1)
             {
-                callStack.pop();
+                Frame finishedFrame = callStack.pop();
+                Frame &caller = callStack.peek();
+                for (int32_t i = 0; i < finishedFrame.argc; i++)
+                {
+                    string actualName = finishedFrame.argv[i].name;
+
+                    int32_t updatedValue =
+                        finishedFrame.locals[i].value;
+
+                    for (int32_t j = 0; j < caller.localCount; j++)
+                    {
+                        if (caller.locals[j].name == actualName)
+                        {
+                            caller.locals[j].value = updatedValue;
+                            break;
+                        }
+                    }
+                }
                 return_ct--;
                 fseek(file, return_pos[return_ct], SEEK_SET);
             }
             else
             {
-                Snapshot *ss= buildSnapshot(callStack);
+                Snapshot *ss = buildSnapshot(callStack);
                 timeline.record(ss);
                 break;
             }
@@ -664,6 +833,7 @@ void executeProgram(const char *resolveBinPath, int64_t mainOffset, Timeline &ti
     }
     fclose(file);
 }
+    
 // PASS 0x3: SERIALIZE TIMELINE
 void write_str(FILE *f, const string &text)
 {
@@ -756,7 +926,7 @@ int32_t main()
     // Pass 2: Execution
     executeProgram("resolve.bin", mainOffset, timeline);
     cout << "Total snapshots: "<< timeline.getStepCount() << endl;
-
+    printSnapshots(timeline);
     // Pass 3: Serialization
     writeTdbg(timeline, "session.tdbg");
     return 0;
