@@ -55,9 +55,16 @@
 - Checked whether session.tdbg is created properly and yes it did
 
 ### Status
-Pass 3 is now completed.
+Pass 3 is now completed and everything is tested.
+
+## Phase 02
+
+### Day 1 
+- I added the helper for phase 2 along with the CRC32
+
+### Status
+Helper function working correctly.
 
 ### Next Step
-
-Final check of the whole program and to remove some warnings shown during the compilation. Ensure that correct session.tdbg is generated everytime.
+I will now modify server.cpp
 
