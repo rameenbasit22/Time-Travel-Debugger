@@ -61,10 +61,11 @@ Pass 3 is now completed and everything is tested.
 
 ### Day 1 
 - I added the helper for phase 2 along with the CRC32
+- I changed server.cpp by removing some constant and adding them to helper.h and also removed some structs like Variable etc
 
 ### Status
-Helper function working correctly.
+Helper function working correctly and also the server.cpp file.
 
 ### Next Step
-I will now modify server.cpp
+I will now work on load balancer.
 
