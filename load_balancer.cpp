@@ -128,3 +128,69 @@ bool sendError(int sock, const string &message)
     }
     return sendAll(sock, message.c_str(), message.size());
 }
+int createListenSocket(int port)
+{
+    int listenSock = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    if (listenSock < 0)
+    {
+        perror("Socket creation failed");
+        exit(1);
+    }
+    int option = 1;
+    setsockopt(
+        listenSock,
+        SOL_SOCKET,
+        SO_REUSEADDR,
+        &option,
+        sizeof(option)
+    );
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(port);
+
+    if (bind(
+        listenSock,
+        reinterpret_cast<sockaddr *>(&address),
+        sizeof(address)
+    ) < 0)
+    {
+        perror("Bind failed");
+        close(listenSock);
+        exit(1);
+    }
+    if (listen(listenSock, LISTEN_BACKLOG) < 0)
+    {
+        perror("Listen failed");
+        close(listenSock);
+        exit(1);
+    }
+    return listenSock;
+}
+int connectToServer(const char *host, int port)
+{
+    int serverSock = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    if (serverSock < 0)
+    {
+        return -1;
+    }
+    sockaddr_in address{};
+
+    address.sin_family = AF_INET;
+    address.sin_port = htons(port);
+    if (inet_pton(AF_INET, host, &address.sin_addr) <= 0)
+    {
+        close(serverSock);
+        return -1;
+    }
+    if (connect(
+        serverSock,
+        reinterpret_cast<sockaddr *>(&address),
+        sizeof(address)
+    ) < 0)
+    {
+        close(serverSock);
+        return -1;
+    }
+    return serverSock;
+}
