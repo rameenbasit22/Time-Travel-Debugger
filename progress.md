@@ -69,7 +69,8 @@ Helper function working correctly and also the server.cpp file.
 
 ### Day 2
 - I implemented connectToServer and createListenSocket functions in load balancer file.
+- Done with the wakeup the server if it is down function
 
 ### Next Step
-I will now work on other functions like connectToServer and connectToServerWithWakeup in load balancer.
+I will now work on other functions like relayOneClient in load balancer.
 
