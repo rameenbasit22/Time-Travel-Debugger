@@ -67,6 +67,9 @@ Pass 3 is now completed and everything is tested.
 ### Status
 Helper function working correctly and also the server.cpp file.
 
+### Day 2
+- I implemented connectToServer and createListenSocket functions in load balancer file.
+
 ### Next Step
-I will now work on other functions in load balancer.
+I will now work on other functions like connectToServer and connectToServerWithWakeup in load balancer.
 
