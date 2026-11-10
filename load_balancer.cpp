@@ -122,12 +122,23 @@ bool sendAll(int sock, const char *buf, size_t n)
 bool sendError(int sock, const string &message)
 {
     char status = 1;
+    CRC32 crc;
+    crc.update(&status, 1);
+    crc.update(message.data(), message.size());
+
+    char trailer[4];
+    checksum_to_bytes(crc.get_checksum(), trailer);
     if (!sendAll(sock, &status, 1))
     {
         return false;
     }
-    return sendAll(sock, message.c_str(), message.size());
+    if (!sendAll(sock, message.data(), message.size()))
+    {
+        return false;
+    }
+    return sendAll(sock, trailer, 4);
 }
+
 int createListenSocket(int port)
 {
     int listenSock = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
