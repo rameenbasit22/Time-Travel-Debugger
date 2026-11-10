@@ -251,3 +251,106 @@ int connectToServerWithWakeup()
     cout << "Server failed to start." << endl;
     return -1;
 }
+void relayOneClient(ClientInfo &c)
+{
+    int serverSock = connectToServerWithWakeup();
+    if (serverSock < 0)
+    {
+        sendError(c.sock, "backend server failed to start");
+        close(c.sock);
+        return;
+    }
+    char buffer[IO_BUFFER_SIZE];
+    bool upload_ok = true;
+    TrailerChecker uploadChecker;
+    while (true)
+    {
+        ssize_t received = recv(c.sock, buffer, sizeof(buffer), 0);
+        if (received == 0)
+        {
+            break;
+        }
+        if (received < 0)
+        {
+            upload_ok = false;
+            break;
+        }
+
+        string forwarded;
+        uploadChecker.process(
+            buffer,
+            static_cast<size_t>(received),
+            forwarded
+        );
+
+        if (!forwarded.empty())
+        {
+            if (!sendAll(serverSock, forwarded.data(), forwarded.size()))
+            {
+                upload_ok = false;
+                break;
+            }
+        }
+    }
+    if (!upload_ok || !uploadChecker.verify())
+    {
+        sendError(c.sock, "upload checksum mismatch");
+        close(serverSock);
+        close(c.sock);
+        return;
+    }
+    char trailer[4];
+    uploadChecker.get_trailer(trailer);
+    if (!sendAll(serverSock, trailer, 4))
+    {
+        sendError(c.sock, "backend server communication failed");
+        close(serverSock);
+        close(c.sock);
+        return;
+    }
+    shutdown(serverSock, SHUT_WR);
+    TrailerChecker responseChecker;
+    string response_body;
+    bool response_ok = true;
+    while (true)
+    {
+        ssize_t received = recv(serverSock, buffer, sizeof(buffer), 0);
+        if (received == 0)
+        {
+            break;
+        }
+        if (received < 0)
+        {
+            response_ok = false;
+            break;
+        }
+
+        string forwarded;
+        responseChecker.process(
+            buffer,
+            static_cast<size_t>(received),
+            forwarded
+        );
+        response_body += forwarded;
+    }
+    if (!response_ok || !responseChecker.verify())
+    {
+        sendError(c.sock, "backend response checksum mismatch");
+    }
+    else
+    {
+        char response_trailer[4];
+        responseChecker.get_trailer(response_trailer);
+
+        if (!sendAll(c.sock, response_body.data(), response_body.size()))
+        {
+            cout << "Client disconnected while receiving response." << endl;
+        }
+        else
+        {
+            sendAll(c.sock, response_trailer, 4);
+        }
+    }
+    close(serverSock);
+    close(c.sock);
+}
