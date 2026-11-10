@@ -354,3 +354,83 @@ void relayOneClient(ClientInfo &c)
     close(serverSock);
     close(c.sock);
 }
+void acceptLoop(int listenSock)
+{
+    while (flag)
+    {
+        fd_set read_fds;
+        FD_ZERO(&read_fds);
+        FD_SET(listenSock, &read_fds);
+        timeval timeout{};
+        timeout.tv_sec = 1;
+        int ready = select(
+            listenSock + 1,
+            &read_fds,
+            nullptr,
+            nullptr,
+            &timeout
+        );
+        if (ready == 0)
+        {
+            continue;
+        }
+        if (ready < 0)
+        {
+            if (errno == EINTR)
+            {
+                continue;
+            }
+            if (flag)
+            {
+                perror("Select error");
+            }
+            continue;
+        }
+        sockaddr_in clientAddress{};
+        socklen_t addressSize = sizeof(clientAddress);
+        int clientSock = accept(
+            listenSock,
+            reinterpret_cast<sockaddr *>(&clientAddress),
+            &addressSize
+        );
+        if (clientSock < 0)
+        {
+            if (errno == EINTR)
+            {
+                continue;
+            }
+
+            if (flag)
+            {
+                perror("Accept error");
+            }
+            continue;
+        }
+        char ip[INET_ADDRSTRLEN];
+        inet_ntop(
+            AF_INET,
+            &clientAddress.sin_addr,
+            ip,
+            sizeof(ip)
+        );
+        ClientInfo client;
+        client.sock = clientSock;
+        client.address = ip;
+        client.port = ntohs(clientAddress.sin_port);
+        client.arrivedAt = time(nullptr);
+        queueMutex.lock();
+        if (pendingClients.size() >= MAX_PENDING_CLIENTS)
+        {
+            queueMutex.unlock();
+            cout << "Queue full. Client refused." << endl;
+            sendError(clientSock, "server busy, try again later");
+            close(clientSock);
+            continue;
+        }
+        pendingClients.enqueue(client);
+
+        cout << "Client added to queue. Waiting: "
+             << pendingClients.size() << endl;
+        queueMutex.unlock();
+    }
+}
