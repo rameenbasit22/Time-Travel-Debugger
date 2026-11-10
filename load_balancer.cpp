@@ -194,3 +194,49 @@ int connectToServer(const char *host, int port)
     }
     return serverSock;
 }
+
+bool startServer(int port)
+{
+    string command = string(SERVER_PATH) + " " +
+                     to_string(port) + " &";
+
+    int res = system(command.c_str());
+    if (res != 0)
+    {
+        return false;
+    }
+    return true;
+}
+int connectToServerWithWakeup()
+{
+    int serverSock = connectToServer(
+        serverHost.c_str(),
+        serverPort
+    );
+    if (serverSock >= 0)
+    {
+        return serverSock;
+    }
+    cout << "Server is not running. Starting server..." << endl;
+    if (!startServer(serverPort))
+    {
+        return -1;
+    }
+    for (int i = 0; i < STARTUP_MAX_ATTEMPTS; i++)
+    {
+        this_thread::sleep_for(
+            chrono::milliseconds(STARTUP_POLL_INTERVAL_MS)
+        );
+        serverSock = connectToServer(
+            serverHost.c_str(),
+            serverPort
+        );
+        if (serverSock >= 0)
+        {
+            cout << "Server started successfully." << endl;
+            return serverSock;
+        }
+    }
+    cout << "Server failed to start." << endl;
+    return -1;
+}
