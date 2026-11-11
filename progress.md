@@ -73,6 +73,12 @@ Helper function working correctly and also the server.cpp file.
 - Added checksum to sendError function in load balancer file
 - Done with the relayOneClient function
 
+### Day 3
+- Implemented acceptLoop function in load balancer.
+
+### Status
+- Most part of load balancer is completed.
+
 ### Next Step
-I will now work on other functions like acceptLoop and dispatcherLoop
+I will now work on other functions like dispatcherLoop
 
