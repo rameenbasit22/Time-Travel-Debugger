@@ -75,10 +75,11 @@ Helper function working correctly and also the server.cpp file.
 
 ### Day 3
 - Implemented acceptLoop function in load balancer.
-
+- Implemented dispatcherLoop and signal and main function
+ 
 ### Status
-- Most part of load balancer is completed.
+- Load balancer is now completed and tested.
 
 ### Next Step
-I will now work on other functions like dispatcherLoop
+I will now work on client.cpp
 
