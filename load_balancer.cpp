@@ -1,4 +1,4 @@
-n// ======================= TIME-TRAVEL DEBUGGER - LOAD BALANCER TEMPLATE =======================
+// ======================= TIME-TRAVEL DEBUGGER - LOAD BALANCER TEMPLATE =======================
 #include <iostream>
 #include <string>
 #include <cstdlib>
@@ -254,11 +254,16 @@ int connectToServerWithWakeup()
 void relayOneClient(ClientInfo &c)
 {
     int serverSock = connectToServerWithWakeup();
-    if (serverSock < 0)
-    {
-        sendError(c.sock, "backend server failed to start");
-        close(c.sock);
-        return;
+    if (serverSock < 0) {
+    char buffer[IO_BUFFER_SIZE];
+
+    while (recv(c.sock, buffer, sizeof(buffer), 0) > 0) {
+    }
+
+    sendError(c.sock, "backend server failed to start");
+    shutdown(c.sock, SHUT_WR);
+    close(c.sock);
+    return;
     }
     char buffer[IO_BUFFER_SIZE];
     bool upload_ok = true;
@@ -275,22 +280,20 @@ void relayOneClient(ClientInfo &c)
             upload_ok = false;
             break;
         }
+       char forwarded[IO_BUFFER_SIZE + 4];
 
-        string forwarded;
-        uploadChecker.process(
-            buffer,
-            static_cast<size_t>(received),
-            forwarded
-        );
+size_t forwarded_size = uploadChecker.process(
+    buffer,
+    static_cast<size_t>(received),
+    forwarded
+);
 
-        if (!forwarded.empty())
-        {
-            if (!sendAll(serverSock, forwarded.data(), forwarded.size()))
-            {
-                upload_ok = false;
-                break;
-            }
-        }
+if (forwarded_size > 0) {
+    if (!sendAll(serverSock, forwarded, forwarded_size)) {
+        upload_ok = false;
+        break;
+    }
+}
     }
     if (!upload_ok || !uploadChecker.verify())
     {
@@ -324,14 +327,17 @@ void relayOneClient(ClientInfo &c)
             response_ok = false;
             break;
         }
+       char forwarded[IO_BUFFER_SIZE + 4];
 
-        string forwarded;
-        responseChecker.process(
-            buffer,
-            static_cast<size_t>(received),
-            forwarded
-        );
-        response_body += forwarded;
+size_t forwarded_size = responseChecker.process(
+    buffer,
+    static_cast<size_t>(received),
+    forwarded
+);
+
+if (forwarded_size > 0) {
+    response_body.append(forwarded, forwarded_size);
+}
     }
     if (!response_ok || !responseChecker.verify())
     {
@@ -433,4 +439,71 @@ void acceptLoop(int listenSock)
              << pendingClients.size() << endl;
         queueMutex.unlock();
     }
+}
+void dispatcherLoop()
+{
+    while (flag)
+    {
+        ClientInfo client;
+        bool found = false;
+        queueMutex.lock();
+        if (!pendingClients.isEmpty())
+        {
+            client = pendingClients.dequeue();
+            found = true;
+        }
+        queueMutex.unlock();
+        if (!found)
+        {
+            this_thread::sleep_for(chrono::milliseconds(10));
+            continue;
+        }
+        cout << "Serving client: "
+             << client.address << endl;
+
+        if (difftime(time(nullptr), client.arrivedAt) > 30)
+        {
+            cout << "Client timed out." << endl;
+            close(client.sock);
+            continue;
+        }
+        relayOneClient(client);
+    }
+}
+
+void handler(int sg)
+{
+    (void)sg;
+    flag = 0;
+}
+int main(int argc, char *argv[])
+{
+    if (argc != 3)
+    {
+        cout << "Usage: ./load_balancer <server_ip> <server_port>"<< endl;
+        return 1;
+    }
+    serverHost = argv[1];
+    serverPort = atoi(argv[2]);
+    if (serverPort <= 0 || serverPort > 65535)
+    {
+        cout << "Invalid server port." << endl;
+        return 1;
+    }
+    signal(SIGINT, handler);
+    int listenSock = createListenSocket(lbPort);
+    cout << "Load balancer listening on port "<< lbPort << endl;
+    thread acceptor(acceptLoop, listenSock);
+    dispatcherLoop();
+    acceptor.join();
+    close(listenSock);
+    queueMutex.lock();
+    while (!pendingClients.isEmpty())
+    {
+        ClientInfo client = pendingClients.dequeue();
+        close(client.sock);
+    }
+    queueMutex.unlock();
+    cout << "Load balancer stopped." << endl;
+    return 0;
 }
