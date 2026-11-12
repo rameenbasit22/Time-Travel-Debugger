@@ -277,3 +277,185 @@ bool openTdbg(const char *path, TdbgReader &reader)
     reader.index = offsets;
     return true;
 }
+void closeTdbg(TdbgReader &reader)
+{
+    if (reader.file_fd >= 0) 
+    {
+        close(reader.file_fd);
+        reader.file_fd = -1;
+    }
+    reader.index.clear();
+}
+bool readBytes(int fd, void *data, size_t size,int64_t &offset, int64_t end_offset)
+{
+    if (offset < 0 || offset > end_offset ||
+        size > static_cast<uint64_t>(end_offset - offset)) {
+        return false;
+    }
+
+    size_t total_read = 0;
+    while (total_read < size) {
+        ssize_t count = pread(
+            fd,
+            static_cast<char *>(data) + total_read,
+            size - total_read,
+            static_cast<off_t>(offset)
+        );
+        if (count < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return false;
+        }
+        if (count == 0) {
+            return false;
+        }
+        total_read += static_cast<size_t>(count);
+        offset += count;
+    }
+    return true;
+}
+bool readString(int fd, string &value,int64_t &offset, int64_t end_offset)
+{
+    int32_t length = 0;
+    if (!readBytes(fd, &length, sizeof(length), offset, end_offset)) {
+        return false;
+    }
+    if (length < 0 || length > 4096) {
+        return false;
+    }
+    value.clear();
+
+    if (length == 0) {
+        return true;
+    }
+    value.resize(length);
+    return readBytes(
+        fd, &value[0], static_cast<size_t>(length),
+        offset, end_offset
+    );
+}
+bool readVariable(int fd, Variable &var,int64_t &offset, int64_t end_offset)
+{
+    if (!readString(fd, var.name, offset, end_offset)) {
+        return false;
+    }
+    if (!readBytes(
+        fd, &var.value, sizeof(var.value), offset, end_offset
+    )) 
+    {
+        return false;
+    }
+    return true;
+}
+Snapshot *readSnapshotAt(TdbgReader &reader, int64_t step)
+{
+    if (reader.file_fd < 0 ||
+        step < 0 ||
+        step >= reader.header.stepCount) 
+    {
+        return nullptr;
+    }
+    int64_t offset = reader.index[step];
+    int64_t end_offset;
+    if (step + 1 < reader.header.stepCount) {
+        end_offset = reader.index[step + 1];
+    } else 
+    {
+        end_offset = reader.header.indexOffset;
+    }
+    Snapshot *snapshot = new Snapshot{};
+    if (!readBytes(
+        reader.file_fd,
+        &snapshot->stackDepth,
+        sizeof(snapshot->stackDepth),
+        offset,
+        end_offset
+    )) 
+    {
+        delete snapshot;
+        return nullptr;
+    }
+
+    if (snapshot->stackDepth < 0 ||
+        snapshot->stackDepth > MAX_STACK_DEPTH) {
+        delete snapshot;
+        return nullptr;
+    }
+
+    for (int32_t i = 0; i < snapshot->stackDepth; i++) {
+        Frame &frame = snapshot->callStack[i];
+
+        if (!readString(
+            reader.file_fd, frame.func_name, offset, end_offset
+        ))
+        {
+            delete snapshot;
+            return nullptr;
+        }
+        if (!readBytes(
+            reader.file_fd,
+            &frame.argc,
+            sizeof(frame.argc),
+            offset,
+            end_offset
+        )) 
+        {
+            delete snapshot;
+            return nullptr;
+        }
+
+        if (frame.argc < 0 || frame.argc > MAX_VARS_PER_FRAME) {
+            delete snapshot;
+            return nullptr;
+        }
+
+        for (int32_t j = 0; j < frame.argc; j++) {
+            if (!readVariable(
+                reader.file_fd, frame.argv[j], offset, end_offset
+            ))
+            {
+                delete snapshot;
+                return nullptr;
+            }
+        }
+        if (!readBytes(
+            reader.file_fd,
+            &frame.returnLine,
+            sizeof(frame.returnLine),
+            offset,
+            end_offset
+        )) 
+        {
+            delete snapshot;
+            return nullptr;
+        }
+        if (!readBytes(
+            reader.file_fd,
+            &frame.localCount,
+            sizeof(frame.localCount),
+            offset,
+            end_offset
+        )) 
+        {
+            delete snapshot;
+            return nullptr;
+        }
+        if (frame.localCount < 0 ||
+            frame.localCount > MAX_VARS_PER_FRAME) {
+            delete snapshot;
+            return nullptr;
+        }
+
+        for (int32_t j = 0; j < frame.localCount; j++) {
+            if (!readVariable(
+                reader.file_fd, frame.locals[j], offset, end_offset
+            )) 
+            {
+                delete snapshot;
+                return nullptr;
+            }
+        }
+    }
+    return snapshot;
+}
