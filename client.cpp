@@ -13,6 +13,7 @@
 #include <netinet/in.h>
 #include <cerrno>
 #include "helper.h"
+#include <sys/stat.h>
 using namespace std;
 
 const char *PROGRAM_NAME = "ttdb";
@@ -212,5 +213,67 @@ bool receiveResponse(int sock, const char *out_tdbg_path,string &out_error)
         out_error = "invalid response status";
         return false;
     }
+    return true;
+}
+bool openTdbg(const char *path, TdbgReader &reader)
+{
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) {
+        return false;
+    }
+    TTDBHeader header{};
+    ssize_t count = pread(fd, &header, sizeof(header), 0);
+    if (count != static_cast<ssize_t>(sizeof(header))) {
+        close(fd);
+        return false;
+    }
+
+    if (memcmp(header.magic, "TTDB", 4) != 0 ||
+        header.version != 1 ||
+        header.stepCount <= 0 ||
+        header.indexOffset < static_cast<int64_t>(sizeof(header))) {
+        close(fd);
+        return false;
+    }
+    struct stat file_info{};
+    if (fstat(fd, &file_info) < 0) {
+        close(fd);
+        return false;
+    }
+    int64_t file_size = file_info.st_size;
+    int64_t index_size =
+        static_cast<int64_t>(header.stepCount) * sizeof(int64_t);
+    if (header.indexOffset > file_size ||
+        index_size > file_size - header.indexOffset) {
+        close(fd);
+        return false;
+    }
+    vector<int64_t> offsets(header.stepCount);
+    count = pread(fd, offsets.data(),
+                  static_cast<size_t>(index_size),
+                  static_cast<off_t>(header.indexOffset));
+
+    if (count != index_size) {
+        close(fd);
+        return false;
+    }
+
+    // Validate snapshot offsets
+    for (int32_t i = 0; i < header.stepCount; i++) {
+        if (offsets[i] < static_cast<int64_t>(sizeof(header)) ||
+            offsets[i] >= header.indexOffset) {
+            close(fd);
+            return false;
+        }
+
+        if (i > 0 && offsets[i] <= offsets[i - 1]) {
+            close(fd);
+            return false;
+        }
+    }
+    // Save reader information
+    reader.file_fd = fd;
+    reader.header = header;
+    reader.index = offsets;
     return true;
 }
