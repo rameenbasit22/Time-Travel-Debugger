@@ -4,7 +4,6 @@
 
 ### Day 1 (4-10-2026)
 #  Project Setup 
-
 - Created the project repository.
 - Added the server.cpp template.
 - Added README.md.
@@ -13,11 +12,12 @@
 - Added source.bin for input.
 - Set up the project in Ubuntu.
 - Initialized Git repository.
+
 # Implementing the custom Stack class
 - I implemented all basic functions like push, pop, peek, isEmpty, depth and a little bit complex function of snapshot_into as well
+
 ### Day 2 (5-10-2026)
 #  Pass 0 
-
 - Implemented source file reading.
 - Added first-word and second-word parsing.
 - Implemented FUNC and FUNC_END validation.
@@ -64,9 +64,6 @@ Pass 3 is now completed and everything is tested.
 - I changed server.cpp by removing some constant and adding them to helper.h and also removed some structs like Variable etc
 - I added socket helper like sendAll and sendError in load_balancer file but crc32 trail is still missing in sendError which will be implemneted later
 
-### Status
-Helper function working correctly and also the server.cpp file.
-
 ### Day 2
 - I implemented connectToServer and createListenSocket functions in load balancer file.
 - Done with the wakeup the server if it is down function
@@ -77,9 +74,13 @@ Helper function working correctly and also the server.cpp file.
 - Implemented acceptLoop function in load balancer.
 - Implemented dispatcherLoop and signal and main function
  
+
+### Day 4
+- Added headers, constant and recvAll function in client.cpp
+
 ### Status
-- Load balancer is now completed and tested.
+- Client.cpp is in process.
 
 ### Next Step
-I will now work on client.cpp
+I will now work on other functions in part A
 
