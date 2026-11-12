@@ -79,10 +79,11 @@ Pass 3 is now completed and everything is tested.
 - Added headers, constant and recvAll function in client.cpp
 - Done with all functions of part A of client.cpp
 - Started working on Part B and implemented openTdbg function
+- Part B all functions are done 
  
 ### Status
 - Client.cpp is in process.
 
 ### Next Step
-I will now work on the other functions in part B of clien.cpp
+I will now work on the other functions in part C of clien.cpp
 
