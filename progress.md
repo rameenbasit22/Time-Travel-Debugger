@@ -83,6 +83,7 @@ Pass 3 is now completed and everything is tested.
  
 ### Day 5
 - Implemented init and closeSession functions of part C of client.cpp
+- Implemented showCurrent and moveBy function of part D of client.cpp
  
 ### Status
 - Client.cpp is in process.
