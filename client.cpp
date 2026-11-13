@@ -490,9 +490,9 @@ void showCurrent(DebugSession &session)
         return;
     }
     printSnapshot(
-        *snapshot,
-        session.current_step + 1,
-        session.reader.header.stepCount
+        static_cast<int32_t>(session.current_step + 1),
+        session.reader.header.stepCount,
+        *snapshot
     );
     delete snapshot;
 }
@@ -513,4 +513,130 @@ void moveBy(DebugSession &session, int32_t delta)
     }
     session.current_step = new_step;
     showCurrent(session);
+}
+bool cmdStart(DebugSession &s, const string &sourcePath)
+{
+    string error;
+    int sock = connectToHost(lb_host.c_str(), lb_port);
+    if (sock < 0) 
+    {
+        cout << "Could not connect to load balancer.\n";
+        return false;
+    }
+    if (!uploadSource(sock, sourcePath.c_str())) 
+    {
+        close(sock);
+        cout << "Could not upload source file.\n";
+        return false;
+    }
+
+    bool result = receiveResponse(sock, "ttdb_new.tdbg", error);
+    close(sock);
+    if (!result) 
+    {
+        remove("ttdb_new.tdbg");
+        cout << error << "\n";
+        return false;
+    }
+
+    TdbgReader new_reader{};
+    new_reader.file_fd = -1;
+    if (!openTdbg("ttdb_new.tdbg", new_reader)) 
+    {
+        remove("ttdb_new.tdbg");
+        cout << "server sent a damaged .tdbg file\n";
+        return false;
+    }
+    if (rename("ttdb_new.tdbg", TDBG_FILE) != 0) {
+        closeTdbg(new_reader);
+        remove("ttdb_new.tdbg");
+        cout << "Could not save debug file.\n";
+        return false;
+    }
+    if (s.active_flag) 
+    {
+        closeTdbg(s.reader);
+    }
+
+    s.reader = new_reader;
+    s.current_step = 0;
+    s.active_flag = 1;
+    cout << "Debugging session started successfully.\n";
+    showCurrent(s);
+    return true;
+}
+bool cmdNext(DebugSession &s)
+{
+    moveBy(s, 1);
+    return true;
+}
+bool cmdPrv(DebugSession &s)
+{
+    moveBy(s, -1);
+    return true;
+}
+bool cmdJmpNext(DebugSession &s, int32_t n)
+{
+    if (n <= 0 || n > MAX_JUMP) 
+    {
+        cout << "Invalid jump value.\n";
+        return false;
+    }
+    moveBy(s, n);
+    return true;
+}
+bool cmdJmpPrv(DebugSession &s, int32_t n)
+{
+    if (n <= 0 || n > MAX_JUMP) 
+    {
+        cout << "Invalid jump value.\n";
+        return false;
+    }
+    moveBy(s, -n);
+    return true;
+}
+void printSnapshot(int32_t step, int32_t totalSteps, const Snapshot &s)
+{
+    cout << "\n========== DEBUG SNAPSHOT ==========\n";
+    cout << "Step: " << step << " of " << totalSteps << "\n";
+    cout << "Call Stack Depth: " << s.stackDepth << "\n";
+    for (int32_t i = 0; i < s.stackDepth; i++) {
+        const Frame &frame = s.callStack[i];
+        cout << "\nFunction: " << frame.func_name << "\n";
+        cout << "Arguments:\n";
+        if (frame.argc == 0) 
+        {
+            cout << "  No arguments\n";
+        }
+        for (int32_t j = 0; j < frame.argc; j++) {
+            cout << "  " << frame.argv[j].name
+                 << " = " << frame.argv[j].value << "\n";
+        }
+
+        cout << "Return Line: " << frame.returnLine << "\n";
+        cout << "Local Variables:\n";
+        if (frame.localCount == 0) 
+        {
+            cout << "  No local variables\n";
+        }
+        for (int32_t j = 0; j < frame.localCount; j++) 
+        {
+            cout << "  " << frame.locals[j].name
+                 << " = " << frame.locals[j].value << "\n";
+        }
+    }
+    cout << "====================================\n";
+}
+void printHelp()
+{
+    cout << "\n========== TTDB COMMANDS ==========\n";
+    cout << "Start source.bin  - Start a new debugging session\n";
+    cout << "Next              - Move to the next snapshot\n";
+    cout << "Prv               - Move to the previous snapshot\n";
+    cout << "Jmp next N        - Jump forward N snapshots\n";
+    cout << "Jmp prv N         - Jump backward N snapshots\n";
+    cout << "Help              - Display available commands\n";
+    cout << "Quit              - Exit the debugger\n";
+    cout << "Exit              - Exit the debugger\n";
+    cout << "===================================\n";
 }
