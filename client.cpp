@@ -459,3 +459,19 @@ Snapshot *readSnapshotAt(TdbgReader &reader, int64_t step)
     }
     return snapshot;
 }
+void initSession(DebugSession &session)
+{
+    session.active_flag = 0;
+    session.reader.file_fd = -1;
+    session.reader.index.clear();
+    session.current_step = 0;
+}
+void closeSession(DebugSession &session)
+{
+    if (session.active_flag) {
+        closeTdbg(session.reader);
+    }
+
+    session.active_flag = 0;
+    session.current_step = 0;
+}
