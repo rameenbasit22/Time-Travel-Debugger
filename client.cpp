@@ -14,6 +14,8 @@
 #include <cerrno>
 #include "helper.h"
 #include <sys/stat.h>
+#include <sstream>
+#include <fcntl.h>
 using namespace std;
 
 const char *PROGRAM_NAME = "ttdb";
@@ -639,4 +641,108 @@ void printHelp()
     cout << "Quit              - Exit the debugger\n";
     cout << "Exit              - Exit the debugger\n";
     cout << "===================================\n";
+}
+bool runCommand(DebugSession &s, const string &line,bool &quitRequested)
+{
+    vector<string> words;
+    string word;
+    stringstream input(line);
+    while (input >> word) 
+    {
+        words.push_back(word);
+    }
+    if (words.empty()) 
+    {
+        return true;
+    }
+    if (words[0] == "ttdb") 
+    {
+        words.erase(words.begin());
+        if (words.empty()) {
+            cout << "unknown command\n";
+            printHelp();
+            return false;
+        }
+    }
+    if (words[0] == "start" && words.size() == 2) 
+    {
+        return cmdStart(s, words[1]);
+    }
+    if (words[0] == "next" && words.size() == 1) 
+    {
+        return cmdNext(s);
+    }
+    if (words[0] == "prv" && words.size() == 1) 
+    {
+        return cmdPrv(s);
+    }
+    if (words[0] == "jmp" && words.size() == 3) 
+    {
+        char *end = nullptr;
+        errno = 0;
+        long number = strtol(words[2].c_str(), &end, 10);
+        if (errno == ERANGE || end == words[2].c_str() ||
+            *end != '\0' || number <= 0 || number > MAX_JUMP) {
+            cout << "unknown command\n";
+            printHelp();
+            return false;
+        }
+
+        int32_t n = static_cast<int32_t>(number);
+        if (words[1] == "next") 
+        {
+            return cmdJmpNext(s, n);
+        }
+        if (words[1] == "prv") 
+        {
+            return cmdJmpPrv(s, n);
+        }
+    }
+    if (words[0] == "help" && words.size() == 1) 
+    {
+        printHelp();
+        return true;
+    }
+    if ((words[0] == "quit" || words[0] == "exit") &&
+        words.size() == 1) {
+        quitRequested = true;
+        return true;
+    }
+    cout << "unknown command\n";
+    printHelp();
+    return false;
+}
+int main(int argc, char *argv[])
+{
+    if (argc != 3) {
+        cout << "Usage: ./client <lb_ip> <lb_port>\n";
+        return 1;
+    }
+    lb_host = argv[1];
+    char *end = nullptr;
+    errno = 0;
+    long port = strtol(argv[2], &end, 10);
+    if (errno == ERANGE || end == argv[2] ||
+        *end != '\0' || port < 1 || port > 65535) {
+        cout << "Invalid port number.\n";
+        return 1;
+    }
+    lb_port = static_cast<int>(port);
+    DebugSession session;
+    initSession(session);
+    bool quitRequested = false;
+    string line;
+    cout << "\nWelcome to Time-Travel Debugger!\n";
+    printHelp();
+    while (!quitRequested) {
+        cout << PROMPT;
+        if (!getline(cin, line)) 
+        {
+            break;
+        }
+        runCommand(session, line, quitRequested);
+    }
+    closeSession(session);
+    cout << "Exiting Time-Travel Debugger.\n";
+    return 0;
 }
