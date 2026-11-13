@@ -86,11 +86,11 @@ Pass 3 is now completed and everything is tested.
 - Implemented showCurrent and moveBy function of part D of client.cpp
 
 ### Day 6
-- Implemented printHelp and printSnapshot function of part D in client.cpp
+- Implemented printHelp and printSnapshot function of part E in client.cpp
  
 ### Status
 - Client.cpp is in process.
 
 ### Next Step
-I will now work on the other functions in part E and F of clien.cpp
+I will now work on the other functions like part F and main of client.cpp
 
