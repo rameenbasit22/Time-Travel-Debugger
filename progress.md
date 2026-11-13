@@ -84,10 +84,13 @@ Pass 3 is now completed and everything is tested.
 ### Day 5
 - Implemented init and closeSession functions of part C of client.cpp
 - Implemented showCurrent and moveBy function of part D of client.cpp
+
+### Day 6
+- Implemented printHelp and printSnapshot function of part D in client.cpp
  
 ### Status
 - Client.cpp is in process.
 
 ### Next Step
-I will now work on the other functions in part D of clien.cpp
+I will now work on the other functions in part E and F of clien.cpp
 
