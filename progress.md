@@ -87,10 +87,11 @@ Pass 3 is now completed and everything is tested.
 
 ### Day 6
 - Implemented printHelp and printSnapshot function of part E in client.cpp
+- Done with part F and main function of client.cpp and compiled as well with no errors.
  
 ### Status
-- Client.cpp is in process.
+- Client.cpp is completed.
 
 ### Next Step
-I will now work on the other functions like part F and main of client.cpp
+I will now do the testing to ensure everything is properly connected and works fine
 
