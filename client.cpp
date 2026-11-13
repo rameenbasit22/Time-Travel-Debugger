@@ -475,3 +475,42 @@ void closeSession(DebugSession &session)
     session.active_flag = 0;
     session.current_step = 0;
 }
+void printSnapshot(int32_t step, int32_t totalSteps, const Snapshot &s);
+void showCurrent(DebugSession &session)
+{
+    if (!session.active_flag) {
+        cout << "No active debugging session.\n";
+        return;
+    }
+    Snapshot *snapshot = readSnapshotAt(
+        session.reader, session.current_step
+    );
+    if (snapshot == nullptr) {
+        cout << "Could not read snapshot.\n";
+        return;
+    }
+    printSnapshot(
+        *snapshot,
+        session.current_step + 1,
+        session.reader.header.stepCount
+    );
+    delete snapshot;
+}
+void moveBy(DebugSession &session, int32_t delta)
+{
+    if (!session.active_flag) {
+        cout << "No active debugging session.\n";
+        return;
+    }
+    int64_t new_step = session.current_step + delta;
+    if (new_step < 0) {
+        cout << "Already at the first step.\n";
+        return;
+    }
+    if (new_step >= session.reader.header.stepCount) {
+        cout << "Already at the last step.\n";
+        return;
+    }
+    session.current_step = new_step;
+    showCurrent(session);
+}
