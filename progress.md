@@ -81,9 +81,12 @@ Pass 3 is now completed and everything is tested.
 - Started working on Part B and implemented openTdbg function
 - Part B all functions are done 
  
+### Day 5
+- Implemented init and closeSession functions of part C of client.cpp
+ 
 ### Status
 - Client.cpp is in process.
 
 ### Next Step
-I will now work on the other functions in part C of clien.cpp
+I will now work on the other functions in part D of clien.cpp
 
