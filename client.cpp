@@ -217,63 +217,92 @@ bool receiveResponse(int sock, const char *out_tdbg_path,string &out_error)
     }
     return true;
 }
+
 bool openTdbg(const char *path, TdbgReader &reader)
 {
     int fd = open(path, O_RDONLY);
-    if (fd < 0) {
+    if (fd < 0)
+    {
         return false;
     }
     TTDBHeader header{};
-    ssize_t count = pread(fd, &header, sizeof(header), 0);
-    if (count != static_cast<ssize_t>(sizeof(header))) {
+    // Server writes a compact 20-byte header.
+    const int64_t header_size = 20;
+    ssize_t count = pread(fd, header.magic, 4, 0);
+    if (count != 4)
+    {
         close(fd);
         return false;
     }
-
+    count = pread(fd, &header.version, sizeof(int32_t), 4);
+    if (count != sizeof(int32_t))
+    {
+        close(fd);
+        return false;
+    }
+    count = pread(fd, &header.stepCount, sizeof(int32_t), 8);
+    if (count != sizeof(int32_t))
+    {
+        close(fd);
+        return false;
+    }
+    count = pread(fd, &header.indexOffset, sizeof(int64_t), 12);
+    if (count != sizeof(int64_t))
+    {
+        close(fd);
+        return false;
+    }
     if (memcmp(header.magic, "TTDB", 4) != 0 ||
         header.version != 1 ||
         header.stepCount <= 0 ||
-        header.indexOffset < static_cast<int64_t>(sizeof(header))) {
+        header.indexOffset < header_size)
+    {
         close(fd);
         return false;
     }
     struct stat file_info{};
-    if (fstat(fd, &file_info) < 0) {
+    if (fstat(fd, &file_info) < 0)
+    {
         close(fd);
         return false;
     }
     int64_t file_size = file_info.st_size;
     int64_t index_size =
         static_cast<int64_t>(header.stepCount) * sizeof(int64_t);
+
     if (header.indexOffset > file_size ||
-        index_size > file_size - header.indexOffset) {
+        index_size > file_size - header.indexOffset)
+    {
         close(fd);
         return false;
     }
     vector<int64_t> offsets(header.stepCount);
-    count = pread(fd, offsets.data(),
-                  static_cast<size_t>(index_size),
-                  static_cast<off_t>(header.indexOffset));
-
-    if (count != index_size) {
+    count = pread(
+        fd,
+        offsets.data(),
+        static_cast<size_t>(index_size),
+        static_cast<off_t>(header.indexOffset)
+    );
+    if (count != index_size)
+    {
         close(fd);
         return false;
     }
-
-    // Validate snapshot offsets
-    for (int32_t i = 0; i < header.stepCount; i++) {
-        if (offsets[i] < static_cast<int64_t>(sizeof(header)) ||
-            offsets[i] >= header.indexOffset) {
+    for (int32_t i = 0; i < header.stepCount; i++)
+    {
+        if (offsets[i] < header_size ||
+            offsets[i] >= header.indexOffset)
+        {
             close(fd);
             return false;
         }
 
-        if (i > 0 && offsets[i] <= offsets[i - 1]) {
+        if (i > 0 && offsets[i] <= offsets[i - 1])
+        {
             close(fd);
             return false;
         }
     }
-    // Save reader information
     reader.file_fd = fd;
     reader.header = header;
     reader.index = offsets;
@@ -632,14 +661,14 @@ void printSnapshot(int32_t step, int32_t totalSteps, const Snapshot &s)
 void printHelp()
 {
     cout << "\n========== TTDB COMMANDS ==========\n";
-    cout << "Start source.bin  - Start a new debugging session\n";
-    cout << "Next              - Move to the next snapshot\n";
-    cout << "Prv               - Move to the previous snapshot\n";
-    cout << "Jmp next N        - Jump forward N snapshots\n";
-    cout << "Jmp prv N         - Jump backward N snapshots\n";
-    cout << "Help              - Display available commands\n";
-    cout << "Quit              - Exit the debugger\n";
-    cout << "Exit              - Exit the debugger\n";
+    cout << "start source.bin  - Start a new debugging session\n";
+    cout << "next              - Move to the next snapshot\n";
+    cout << "prv               - Move to the previous snapshot\n";
+    cout << "jmp next N        - Jump forward N snapshots\n";
+    cout << "jmp prv N         - Jump backward N snapshots\n";
+    cout << "help              - Display available commands\n";
+    cout << "quit              - Exit the debugger\n";
+    cout << "exit              - Exit the debugger\n";
     cout << "===================================\n";
 }
 bool runCommand(DebugSession &s, const string &line,bool &quitRequested)
