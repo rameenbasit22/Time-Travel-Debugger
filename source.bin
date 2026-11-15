@@ -3,6 +3,6 @@ set x 10
 call addNum x
 func_end
 
-func addNum
+func addNum x
 add x 5
 func_end
