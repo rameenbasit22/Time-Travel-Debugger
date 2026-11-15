@@ -347,7 +347,7 @@ if (forwarded_size > 0) {
     {
         char response_trailer[4];
         responseChecker.get_trailer(response_trailer);
-
+        cout << "Response bytes received from server: "<< response_body.size() << endl;
         if (!sendAll(c.sock, response_body.data(), response_body.size()))
         {
             cout << "Client disconnected while receiving response." << endl;
@@ -355,6 +355,7 @@ if (forwarded_size > 0) {
         else
         {
             sendAll(c.sock, response_trailer, 4);
+            cout << "Response checksum trailer forwarded." << endl;
         }
     }
     close(serverSock);
