@@ -89,9 +89,9 @@ Pass 3 is now completed and everything is tested.
 - Implemented printHelp and printSnapshot function of part E in client.cpp
 - Done with part F and main function of client.cpp and compiled as well with no errors.
  
-### Status
-- Client.cpp is completed.
+### Day 7
+- Tested all connections and did some changes in client and load balancer file 
 
-### Next Step
-I will now do the testing to ensure everything is properly connected and works fine
+### Status
+- Everything working fine.
 
